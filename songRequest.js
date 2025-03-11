@@ -1,0 +1,323 @@
+(function() {
+    var config = loadConfig("./addons/spotifyConfig.json");
+
+    // Initialisierung der Variablen aus der Konfiguration
+    var filePath = config.filePath || './addons/spotifyAccountCode.txt';
+    var tokenFilePath = config.tokenFilePath || './addons/spotifyTokens.json';
+    var CLIENT_ID = config.clientId;
+    var CLIENT_SECRET = config.clientSecret;
+    var BASE64_CODE = convertToBase64(CLIENT_ID + ":" + CLIENT_SECRET);
+    var REDIRECT_URI = config.redirectUri || "https://127.0.0.1:8888/callback";
+    // Initialisierung der Variablen zu Skriptstart
+    var ACCESS_TOKEN = null;
+    var REFRESH_TOKEN = null;
+    var EXPIRES_AT = 0;
+    var attempt = 1;
+
+    // --- Kleinere Helperfunktionen ---
+    // Konvertiert den übergebenen Input in einen Base64 kodierten String.
+    function convertToBase64(input) {
+        var Base64 = Packages.java.util.Base64;
+        var encoder = Base64.getEncoder();
+        var encoded = encoder.encodeToString(new java.lang.String(input).getBytes("UTF-8"));
+        return encoded;
+    }
+
+    // Liest den Inhalt einer Datei und gibt die Datei zurück.
+    function readFromFile(path) {
+        var file = new java.io.File(path);
+        if (!file.exists()) {
+            return null;
+        }
+        var reader = new java.io.BufferedReader(new java.io.FileReader(file));
+        var line;
+        var content = "";
+        while ((line = reader.readLine()) != null) {
+            content += line + "\n";
+        }
+        reader.close();
+        return content.trim();
+    }
+    
+
+    // Speichert die übergebenen Daten in einer Datei.
+    function saveToFile(path, data) {
+        var file = new java.io.File(path);
+        var writer = new java.io.BufferedWriter(new java.io.FileWriter(file));
+        writer.write(data);
+        writer.close();
+    }
+
+    // Liefert eine .json Dateie als geparstes JSON Objekt zurück.
+    function loadConfig(path) {
+        var json = readFromFile(path);
+        if (json) {
+            var config = JSON.parse(json);
+            return config;
+        }
+        return {};
+    }
+
+    // Lädt die Variablen vom konfigurierten Dateipfad in die Laufzeitumgebung (Variablen Anpassung während das Skript läuft).
+    function loadTokens() {
+        var json = readFromFile(tokenFilePath);
+        if (json) {
+            var tokens = JSON.parse(json);
+            ACCESS_TOKEN = tokens.access_token;
+            REFRESH_TOKEN = tokens.refresh_token;
+            EXPIRES_AT = tokens.expires_at;
+        }
+    }
+
+    // Speichert die erhaltenen API Tokens im konfigurierten Dateipfad.
+    function saveTokens(accessToken, refreshToken, expiresIn) {
+        var expiresAt = Date.now() + expiresIn * 1000;
+        var data = JSON.stringify({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_at: expiresAt
+        });
+        saveToFile(tokenFilePath, data);
+    }
+  
+    // Regex zum extrahieren des ID Parts der Spotify URL
+    function extractSpotifyId(url) {
+        var match = url.match(/track\/([a-zA-Z0-9]+)/);
+        return match ? match[1] : null;
+    }
+
+    // Erstellt den benutzerdefinierten Spotify Log ordner
+    function createLogFolder() {
+        var logFolder = new java.io.File("/home/botuser/phantombot2/logs/spotify/");
+        if (!logFolder.exists()) {
+            logFolder.mkdirs();
+        }
+    }
+    
+    // Funktion zum Erstellen der Spotify Log-Datei mit aktuellem Datum
+    function getLogFileName() {
+        var date = new java.util.Date();
+        var sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+        return "/home/botuser/phantombot2/logs/spotify/" + sdf.format(date) + ".txt";
+    }
+    
+    // Funktion zum Hinzufügen eines Logs in die Datei
+    function log(type, message) {
+        createLogFolder();
+        var logFile = new java.io.File(getLogFileName());
+        var writer = new java.io.BufferedWriter(new java.io.FileWriter(logFile, true));
+        var timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
+        writer.write("[" + timestamp + "] ["+type.toUpperCase()+"]: " + message + "\n");
+        writer.close();
+    }
+
+    // --- Hauptfunktionen ---
+    /**
+     * Ruft Informationen zu einem bestimmten Track von der Spotify API ab.
+     * @function getTrackInfo
+     * @param {string} trackId - Die ID des Tracks, dessen Informationen abgerufen werden sollen
+     * @returns {Object|null} - Ein Objekt mit den Track-Infos oder null bei einem Fehler
+     */
+    function getTrackInfo(trackId) {
+        var apiUrl = "https://api.spotify.com/v1/tracks/" + trackId;
+    
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(apiUrl);
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Bearer " + ACCESS_TOKEN);
+    
+        let response = Packages.com.gmt2001.httpclient.HttpClient.get(uri, headers);
+    
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Abrufen der Track-Infos: " + response.exception().toString());
+            return null;
+        } else if (response.isSuccess()) {
+            let apiResponse = JSON.parse($.jsString(response.responseBody()));
+            let trackName = apiResponse.name;
+            let artistName = apiResponse.artists[0].name;
+            return { trackName, artistName };
+        } else {
+            log("error","❌ Fehler beim Abrufen der Track-Infos mit Statuscode: " + response.responseCode().code());
+            let apiResponse = JSON.parse($.jsString(response.responseBody()));
+            log("info",apiResponse);
+            return null;
+        }
+    }
+
+    /**
+     * Fügt einen Track zur Spotify-Warteschlange hinzu.
+     * @function addToQueue
+     * @param {string} spotifyUrl - Die Spotify-URL des Tracks, der hinzugefügt werden soll
+     * @param {string} sender - Der Benutzer, der den Befehl ausgeführt hat
+     */
+    function addToQueue(spotifyUrl, sender) {
+        if (Date.now() >= EXPIRES_AT){
+            log("warning","⚠️ Spotify Access Token abgelaufen, versuche zu aktualisieren!");
+            refreshAccessToken();
+        }
+
+        var trackId = extractSpotifyId(spotifyUrl);
+        if (!trackId) {
+            log("error","❌ Ungültiger Spotify-Link von " + sender);
+            $.say("❌ Ungültiger Spotify-Link. Richtiges Format: https://open.spotify.com/intl-de/track/...");
+            return;
+        }
+
+        var apiUrl = "https://api.spotify.com/v1/me/player/queue?uri=spotify:track:" + trackId;
+        log("info","🕒 Versuche Song der Spotify Warteschlange hinzuzufügen...");
+
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(apiUrl);
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Bearer "+ACCESS_TOKEN);
+        let response = Packages.com.gmt2001.httpclient.HttpClient.post(uri, headers, '');
+
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Hinzufügen zur Warteschlange: " + response.exception().toString());
+            $.say($.whisperPrefix(sender) + 'Es gab ein Problem beim Hinzufügen zur Warteschlange.');
+        } else if (response.isSuccess()) {
+            let trackInfo = getTrackInfo(trackId);
+            attempt = 1;
+            if (trackInfo) {
+                log("info","✅ Der Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde zur Warteschlange hinzugefügt!");
+                $.say("✅ '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde zur Warteschlange hinzugefügt!");
+            } else {
+                $.say("✅ Erfolgreich zur Warteschlange hinzugefügt!");
+            }
+        } else if(response.responseCode().code() === 401){
+            log("warning","⚠️ AddToQueue fehlgeschlagen, AccessToken invalide -> Versuche RefreshAccessToken()");
+            let apiResponse = $.jsString(response.responseBody());
+            log("info",apiResponse);
+            refreshAccessToken();
+            
+            if (attempt < 4) {
+                log("info","🔄 Versuche erneut... (" + attempt + "/3)");
+                attempt++;
+                addToQueue(spotifyUrl, sender);
+            } else {
+                log("error","❌ Nach 3 Versuchen konnte der Song nicht zur Warteschlange hinzugefügt werden.");
+            }
+        }
+    }
+
+    /**
+     * Leitet den Benutzer zur Spotify-Authentifizierung weiter.
+     * @function redirectToSpotifyAuth
+     */
+    function redirectToSpotifyAuth() {
+        const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user-modify-playback-state`;
+        log("info","Bitte gehe zu diesem Link und autorisiere die App: " + authUrl);
+        $.say("Spotify Auth Link: " + authUrl);
+    }
+
+    /**
+     * Erneuert das Access Token, wenn es abgelaufen ist.
+     * @function refreshAccessToken
+     */
+    function refreshAccessToken() {
+        log("info","🔄 Access Token wird erneuert...");
+        const url = "https://accounts.spotify.com/api/token";
+        const data = `grant_type=refresh_token&refresh_token=${REFRESH_TOKEN}&client_id=${CLIENT_ID}`;
+        
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Basic " + BASE64_CODE);
+        headers.add("Content-Type", "application/x-www-form-urlencoded"); 
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(url);
+        let response = Packages.com.gmt2001.httpclient.HttpClient.post(uri, headers, data);
+        
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Aktualisieren des Access Tokens: " + response.exception().toString());
+        } else if (response.isSuccess()) {
+            let apiResponse = $.jsString(response.responseBody());
+            var res = JSON.parse(apiResponse);
+            saveTokens(res.access_token, res.refresh_token || REFRESH_TOKEN, res.expires_in);   //  || REFRESH_TOKEN notwendig weil wegen möglichem fehlenden refresh token in antwort
+            loadTokens(); 
+            log("info","✅ Access Token erfolgreich aktualisiert!");
+        } else {
+            log("error","❌ HTTP Request fehlgeschlagen mit Statuscode: " + response.responseCode().code());
+            log("info",$.jsString(response.responseBody()));
+        }
+    }
+
+    /**
+     * Fordert ein neues Access Token mit dem gegebenen Autorisierungs-Code an.
+     * @function requestAccessToken
+     * @param {string} code - Der Autorisierungs-Code, der von Spotify zurückgegeben wurde
+     */
+    function requestAccessToken(code) {
+        const url = "https://accounts.spotify.com/api/token";
+        const data = `grant_type=authorization_code&code=${code}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+
+        log("info","🕒 Versuche Access Token via Account Code zu erhalten...");
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Basic " + BASE64_CODE);
+        headers.add("Content-Type", "application/x-www-form-urlencoded");
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(url);
+        let response = Packages.com.gmt2001.httpclient.HttpClient.post(uri, headers, data);
+
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Abrufen des Access Tokens: " + response.exception().toString());
+        } else if (response.isSuccess()) {
+            let apiResponse = $.jsString(response.responseBody());
+            log("info","✅ Access Token erfolgreich erhalten!");
+            var res = JSON.parse(apiResponse);
+            saveTokens(res.access_token, res.refresh_token, res.expires_in);
+            loadTokens();
+        } else {
+            log("error","❌ HTTP Request fehlgeschlagen mit Statuscode: " + response.responseCode().code());
+            var apiResponse = $.jsString(response.responseBody());
+            log("info",apiResponse);
+        }
+    }
+
+    $.bind('initReady', function () {
+        $.registerChatCommand('./custom/songRequest.js', 'spotify', $.PERMISSION.Mod);
+        $.registerChatCommand('./custom/songRequest.js', 'spotifyauth', $.PERMISSION.Mod);
+        loadTokens(); // Doppelt hält besser
+        log("info",'🚀 Spotify Song Request Skript erfolgreich initialisiert.');
+        $.log.error('🚀 Spotify Song Request Skript erfolgreich initialisiert.');
+    });
+
+    $.bind('command', function (event) {
+        var sender = event.getSender();
+        var command = event.getCommand();
+        var args = event.getArgs();
+        var tags = event.getTags();
+
+        if (command.equalsIgnoreCase('spotifyAuth')) {
+            if (!$.checkUserPermission(sender, tags, $.PERMISSION.Mod)) {
+                $.say($.whisperPrefix(sender) + "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!");
+                return;
+            }
+            if (args.length === 0) {
+                redirectToSpotifyAuth();
+                return;
+            }
+            if (args[0].equalsIgnoreCase('connect')) {
+                redirectToSpotifyAuth();
+            } else {
+                var code = args[0];
+                saveToFile(filePath, code);
+                requestAccessToken(code);
+                $.say($.whisperPrefix(sender) + 'Authorization Code gespeichert.');
+            }
+        }
+
+        if (command.equalsIgnoreCase('spotify')) {
+            if (!$.checkUserPermission(sender, tags, $.PERMISSION.Mod)) {
+                $.say($.whisperPrefix(sender) + "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!");
+                return;
+            }
+            var input = args[0];
+            if (!ACCESS_TOKEN) {
+                if (readFromFile(filePath)) {
+                    requestAccessToken(readFromFile(filePath));
+                } else {
+                    $.say($.whisperPrefix(sender) + 'Bitte autorisiere dein Spotify-Konto mit !spotifyAuth <code>');
+                }
+            } else {
+                addToQueue(input, sender);
+            }
+        }
+    });
+
+    loadTokens(); // Doppelt hält besser
+})();
