@@ -16,6 +16,26 @@ Für die Nutzung des Spotify-Features werden Spotify API-Daten benötigt. Diese 
 }
 ```
 
+## Language Daten
+
+Für die Übersetzung von Texten wird eine Sprachdatei benötigt. Die Texte müssen in einer Datei namens `./addons/spotifyLang.json` im folgenden Format gespeichert werden:
+
+```json
+{
+    "song_added": "✅ '{{track}}' - {{artist}}",
+    "song_added_simple": "✅ +1",
+    "invalid_link": "❌ Format: https://open.spotify.com/intl-de/track/...",
+    "add_to_queue_exception": "❌ Es gab ein Problem beim Hinzufügen zur Warteschlange.",
+    "auth_link": "🔗 Spotify Auth Link: {{url}}",
+    "auth_saved": "🔐 Auth-Code erfolgreich gespeichert.",
+    "auth_hint": "🔑 Bitte autorisiere dein Spotify-Konto mit !spotifyAuth <code>",
+    "error": "❌ Error: {{error}}",
+    "invalid_permission": "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!",
+    "song_null": "❌ No Song Sadge",
+    "song_current": "🎶 {{track}} - {{artist}}"
+}
+```
+
 ### Wie man die API-Daten erhält:
 
 1. Gehe auf [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications).

@@ -1,6 +1,17 @@
 (function() {
     var config = loadConfig("./addons/spotifyConfig.json");
+    var lang = loadConfig("./addons/spotifyLang.json");
 
+    function translate(key, replacements) {
+        var str = lang[key] || key;
+        if (replacements) {
+            for (var k in replacements) {
+                str = str.replace(new RegExp("{{" + k + "}}", "g"), replacements[k]);
+            }
+        }
+        return str;
+    }
+    
     // Initialisierung der Variablen aus der Konfiguration
     var filePath = config.filePath || './addons/spotifyAccountCode.txt';
     var tokenFilePath = config.tokenFilePath || './addons/spotifyTokens.json';
@@ -158,7 +169,7 @@
         var trackId = extractSpotifyId(spotifyUrl);
         if (!trackId) {
             log("error","❌ Ungültiger Spotify-Link von " + sender);
-            $.say("❌ Ungültiger Spotify-Link. Richtiges Format: https://open.spotify.com/intl-de/track/...");
+            $.say(translate("invalid_link"));
             return;
         }
 
@@ -172,15 +183,15 @@
 
         if (response.hasException()) {
             log("error","❌ Fehler beim Hinzufügen zur Warteschlange: " + response.exception().toString());
-            $.say($.whisperPrefix(sender) + 'Es gab ein Problem beim Hinzufügen zur Warteschlange.');
+            $.say($.whisperPrefix(sender) + translate("add_to_queue_exception"));
         } else if (response.isSuccess()) {
             let trackInfo = getTrackInfo(trackId);
             attempt = 1;
             if (trackInfo) {
                 log("info","✅ Der Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde zur Warteschlange hinzugefügt!");
-                $.say("✅ '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde zur Warteschlange hinzugefügt!");
+                $.say(translate("song_added", {track: trackInfo.trackName, artist: trackInfo.artistName}));
             } else {
-                $.say("✅ Erfolgreich zur Warteschlange hinzugefügt!");
+                $.say(translate("song_added_simple"));
             }
         } else if(response.responseCode().code() === 401){
             log("warning","⚠️ AddToQueue fehlgeschlagen, AccessToken invalide -> Versuche RefreshAccessToken()");
@@ -203,9 +214,9 @@
      * @function redirectToSpotifyAuth
      */
     function redirectToSpotifyAuth() {
-        const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=user-modify-playback-state`;
+        const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&&scope=user-modify-playback-state%20user-read-currently-playing%20user-read-playback-state`;
         log("info","Bitte gehe zu diesem Link und autorisiere die App: " + authUrl);
-        $.say("Spotify Auth Link: " + authUrl);
+        $.say(translate("auth_link" , {url: authUrl}));
     }
 
     /**
@@ -268,9 +279,40 @@
         }
     }
 
+    function getCurrentTrack() {
+        if (Date.now() >= EXPIRES_AT){
+            log("warning","⚠️ Spotify Access Token abgelaufen, versuche zu aktualisieren!");
+            refreshAccessToken();
+        }
+    
+        var apiUrl = "https://api.spotify.com/v1/me/player/currently-playing";
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(apiUrl);
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Bearer " + ACCESS_TOKEN);
+        
+        let response = Packages.com.gmt2001.httpclient.HttpClient.get(uri, headers);
+    
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Abrufen des aktuellen Songs: " + response.exception().toString());
+            return null;
+        } else if (response.isSuccess()) {
+            let apiResponse = JSON.parse($.jsString(response.responseBody()));
+            if (!apiResponse || !apiResponse.item) {
+                return null;
+            }
+            let trackName = apiResponse.item.name;
+            let artistName = apiResponse.item.artists[0].name;
+            return { trackName, artistName };
+        } else {
+            log("error","❌ Fehler beim Abrufen des aktuellen Songs mit Statuscode: " + response.responseCode().code());
+            return null;
+        }
+    }
+
     $.bind('initReady', function () {
         $.registerChatCommand('./custom/songRequest.js', 'spotify', $.PERMISSION.Mod);
         $.registerChatCommand('./custom/songRequest.js', 'spotifyauth', $.PERMISSION.Mod);
+        $.registerChatCommand('./custom/songRequest.js', 'song', $.PERMISSION.User);
         loadTokens(); // Doppelt hält besser
         log("info",'🚀 Spotify Song Request Skript erfolgreich initialisiert.');
         $.log.error('🚀 Spotify Song Request Skript erfolgreich initialisiert.');
@@ -284,7 +326,7 @@
 
         if (command.equalsIgnoreCase('spotifyAuth')) {
             if (!$.checkUserPermission(sender, tags, $.PERMISSION.Mod)) {
-                $.say($.whisperPrefix(sender) + "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!");
+                $.say($.whisperPrefix(sender) + translate("invalid_permission"));
                 return;
             }
             if (args.length === 0) {
@@ -297,13 +339,14 @@
                 var code = args[0];
                 saveToFile(filePath, code);
                 requestAccessToken(code);
-                $.say($.whisperPrefix(sender) + 'Authorization Code gespeichert.');
+                $.say($.whisperPrefix(sender) + translate("auth_saved"));
+
             }
         }
 
         if (command.equalsIgnoreCase('spotify')) {
             if (!$.checkUserPermission(sender, tags, $.PERMISSION.Mod)) {
-                $.say($.whisperPrefix(sender) + "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!");
+                $.say($.whisperPrefix(sender)  + translate("invalid_permission"));
                 return;
             }
             var input = args[0];
@@ -312,9 +355,19 @@
                     requestAccessToken(readFromFile(filePath));
                 } else {
                     $.say($.whisperPrefix(sender) + 'Bitte autorisiere dein Spotify-Konto mit !spotifyAuth <code>');
+                    $.say($.whisperPrefix(sender)  + translate("auth_hint"));
                 }
             } else {
                 addToQueue(input, sender);
+            }
+        }
+
+        if (command.equalsIgnoreCase("song")) {
+            var currentTrack = getCurrentTrack();
+            if (currentTrack) {
+                $.say(translate("song_current", {track: currentTrack.trackName, artist: currentTrack.artistName}));
+            } else {
+                $.say(translate("song_null"));
             }
         }
     });
