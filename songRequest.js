@@ -145,7 +145,8 @@
             let apiResponse = JSON.parse($.jsString(response.responseBody()));
             let trackName = apiResponse.name;
             let artistName = apiResponse.artists[0].name;
-            return { trackName, artistName };
+            let duration = apiResponse.duration_ms;
+            return { trackName, artistName, duration };
         } else {
             log("error","❌ Fehler beim Abrufen der Track-Infos mit Statuscode: " + response.responseCode().code());
             let apiResponse = JSON.parse($.jsString(response.responseBody()));
@@ -173,12 +174,25 @@
             return;
         }
 
+        let trackInfo = getTrackInfo(trackId);
+        if (!trackInfo) {
+            log("error", "❌ Konnte Track-Infos nicht abrufen.");
+            $.say(translate("invalid_link"));
+            return;
+        }
+
+        if (trackInfo && trackInfo.duration >= 600000) {
+            log("info", "⏱️ Track '" + trackInfo.trackName + "' ist länger als 10 Minuten (" + Math.round(trackInfo.duration / 60000) + "min) — wird nicht hinzugefügt.");
+            $.say(translate("song_too_long", {track: trackInfo.trackName, artist: trackInfo.artistName, duration: Math.round(trackInfo.duration / 60000) }));
+            return;
+        }
+
         var apiUrl = "https://api.spotify.com/v1/me/player/queue?uri=spotify:track:" + trackId;
         log("info","🕒 Versuche Song der Spotify Warteschlange hinzuzufügen...");
 
         let uri = Packages.com.gmt2001.httpclient.URIUtil.create(apiUrl);
         let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
-        headers.add("Authorization", "Bearer "+ACCESS_TOKEN);
+        headers.add("Authorization", "Bearer " + ACCESS_TOKEN);
         let response = Packages.com.gmt2001.httpclient.HttpClient.post(uri, headers, '');
 
         if (response.hasException()) {
@@ -206,6 +220,49 @@
             } else {
                 log("error","❌ Nach 3 Versuchen konnte der Song nicht zur Warteschlange hinzugefügt werden.");
             }
+        }
+    }
+
+    function getUpcomingTracks() {
+        if (Date.now() >= EXPIRES_AT){
+            log("warning","⚠️ Spotify Access Token abgelaufen, versuche zu aktualisieren!");
+            refreshAccessToken();
+        }
+
+        var apiUrl = "https://api.spotify.com/v1/me/player/queue";
+        let uri = Packages.com.gmt2001.httpclient.URIUtil.create(apiUrl);
+        let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+        headers.add("Authorization", "Bearer " + ACCESS_TOKEN);
+        let response = Packages.com.gmt2001.httpclient.HttpClient.get(uri, headers);
+
+        if (response.hasException()) {
+            log("error","❌ Fehler beim Abrufen der Player-Infos: " + response.exception().toString());
+            $.say(translate("fetch_player_exception"));
+            return;
+        } else if (response.isSuccess()) {
+            let apiResponse = JSON.parse($.jsString(response.responseBody()));
+            let queuePreview = [];
+
+            if (apiResponse && apiResponse.currently_playing) {
+                let currentTrack = apiResponse.currently_playing;
+                queuePreview.push("🎶 1. " + currentTrack.name + " - " + currentTrack.artists[0].name);
+            } else {
+                queuePreview.push("❌ Es wird derzeit kein Song gespielt.");
+            }
+
+            if (apiResponse && apiResponse.queue && apiResponse.queue.length > 0) {
+                for (var i = 1; i < Math.min(5, apiResponse.queue.length); i++) {
+                    let track = apiResponse.queue[i];
+                    queuePreview.push((i+1) + ". " + track.name + " - " + track.artists[0].name);
+                }
+            } else {
+                queuePreview.push("ℹ️ Keine weiteren Tracks in der Warteschlange sichtbar.");
+            }
+
+            $.say(queuePreview.join(" -> "));
+        } else {
+            log("error","❌ Fehler beim Abrufen der Player-Infos mit Statuscode: " + response.responseCode().code());
+            $.say(translate("fetch_player_error"));
         }
     }
 
@@ -313,6 +370,7 @@
         $.registerChatCommand('./custom/songRequest.js', 'spotify', $.PERMISSION.Mod);
         $.registerChatCommand('./custom/songRequest.js', 'spotifyauth', $.PERMISSION.Mod);
         $.registerChatCommand('./custom/songRequest.js', 'song', $.PERMISSION.User);
+        $.registerChatCommand('./custom/songRequest.js', 'queue', $.PERMISSION.User);
         loadTokens(); // Doppelt hält besser
         log("info",'🚀 Spotify Song Request Skript erfolgreich initialisiert.');
         $.log.error('🚀 Spotify Song Request Skript erfolgreich initialisiert.');
@@ -369,6 +427,16 @@
             } else {
                 $.say(translate("song_null"));
             }
+        }
+
+        if (command.equalsIgnoreCase("queue")) {
+            getUpcomingTracks();
+            var currentTrack = getCurrentTrack();
+            // if (currentTrack) {
+            //     $.say(translate("song_current", {track: currentTrack.trackName, artist: currentTrack.artistName}));
+            // } else {
+            //     $.say(translate("song_null"));
+            // }
         }
     });
 
