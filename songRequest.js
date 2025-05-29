@@ -158,20 +158,52 @@
     /**
      * Fügt einen Track zur Spotify-Warteschlange hinzu.
      * @function addToQueue
-     * @param {string} spotifyUrl - Die Spotify-URL des Tracks, der hinzugefügt werden soll
+     * @param {string} spotifyInput - Die Spotify-URL des Tracks, der hinzugefügt werden soll
      * @param {string} sender - Der Benutzer, der den Befehl ausgeführt hat
      */
-    function addToQueue(spotifyUrl, sender) {
+    function addToQueue(spotifyInput, sender) {
         if (Date.now() >= EXPIRES_AT){
             log("warning","⚠️ Spotify Access Token abgelaufen, versuche zu aktualisieren!");
             refreshAccessToken();
         }
 
-        var trackId = extractSpotifyId(spotifyUrl);
+        var trackId = extractSpotifyId(spotifyInput);
         if (!trackId) {
-            log("error","❌ Ungültiger Spotify-Link von " + sender);
-            $.say(translate("invalid_link"));
-            return;
+            log("info", "🔍 Kein gültiger Spotify-Link erkannt, versuche " + spotifyInput + " über die Spotify-Suche zu finden...");
+
+            let searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(spotifyInput)}&type=track&limit=3`;
+
+            let uri = Packages.com.gmt2001.httpclient.URIUtil.create(searchUrl);
+            let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+            headers.add("Authorization", "Bearer " + ACCESS_TOKEN);
+            let response = Packages.com.gmt2001.httpclient.HttpClient.get(uri, headers);
+
+            if (response.hasException() || !response.isSuccess()) {
+                log("error", "❌ Fehler bei der Spotify-Suche: " + response.exception().toString());
+                $.say("Es gab ein Problem bei der Spotify-Suche.");
+                return;
+            }
+
+            let responseBody = $.jsString(response.responseBody());
+            log("debug", "Antwort von Spotify-Suche: " + responseBody);
+
+            let body;
+            try {
+                body = JSON.parse(responseBody);
+            } catch (e) {
+                log("error", "❌ Fehler beim Parsen der Spotify-Antwort: " + e.message);
+                $.say("Die Antwort von Spotify konnte nicht gelesen werden.");
+                return;
+            }
+            if (!body.tracks || !body.tracks.items || body.tracks.items.length === 0) {
+                $.say("Kein passender Song auf Spotify gefunden.");
+                return;
+            }
+
+            trackId = body.tracks.items[0].id;
+            log("info", "🎯 Gefundener Track: " + body.tracks.items[0].name + " von " + body.tracks.items[0].artists[0].name);
+        } else {
+            log("info", "🎵 Track-ID extrahiert: " + trackId);
         }
 
         let trackInfo = getTrackInfo(trackId);
@@ -216,7 +248,7 @@
             if (attempt < 4) {
                 log("info","🔄 Versuche erneut... (" + attempt + "/3)");
                 attempt++;
-                addToQueue(spotifyUrl, sender);
+                addToQueue(spotifyInput, sender);
             } else {
                 log("error","❌ Nach 3 Versuchen konnte der Song nicht zur Warteschlange hinzugefügt werden.");
             }
@@ -407,7 +439,7 @@
                 $.say($.whisperPrefix(sender)  + translate("invalid_permission"));
                 return;
             }
-            var input = args[0];
+            var input = args.join('+');
             if (!ACCESS_TOKEN) {
                 if (readFromFile(filePath)) {
                     requestAccessToken(readFromFile(filePath));
@@ -432,11 +464,6 @@
         if (command.equalsIgnoreCase("queue")) {
             getUpcomingTracks();
             var currentTrack = getCurrentTrack();
-            // if (currentTrack) {
-            //     $.say(translate("song_current", {track: currentTrack.trackName, artist: currentTrack.artistName}));
-            // } else {
-            //     $.say(translate("song_null"));
-            // }
         }
     });
 
