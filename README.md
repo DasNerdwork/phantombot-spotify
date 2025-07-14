@@ -42,6 +42,7 @@ Für die Übersetzung von Texten wird eine Sprachdatei benötigt. Die Texte müs
 2. Melde dich mit deinem Spotify-Konto an.
 3. Erstelle eine neue Anwendung, um deine `clientId` und `clientSecret` zu erhalten.
 4. Verwende die `redirectUri` deiner Wahl, z. B. `https://127.0.0.1:8888/callback` für lokale Tests.
+5. Wichtig: Im Dev Portal muss ein Nutzer für die Spotify-Email zur App hinzugefügt werden.
 
 ## Einrichtungsprozess
 
