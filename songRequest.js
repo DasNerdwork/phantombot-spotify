@@ -99,7 +99,7 @@
 
     // Erstellt den benutzerdefinierten Spotify Log ordner
     function createLogFolder() {
-        var logFolder = new java.io.File("/home/botuser/phantombot2/logs/spotify/");
+        var logFolder = new java.io.File("/home/botuser/phantombot-junky/logs/spotify/");
         if (!logFolder.exists()) {
             logFolder.mkdirs();
         }
@@ -109,7 +109,7 @@
     function getLogFileName() {
         var date = new java.util.Date();
         var sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
-        return "/home/botuser/phantombot2/logs/spotify/" + sdf.format(date) + ".txt";
+        return "/home/botuser/phantombot-junky/logs/spotify/" + sdf.format(date) + ".txt";
     }
     
     // Funktion zum Hinzufügen eines Logs in die Datei

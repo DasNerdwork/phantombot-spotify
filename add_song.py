@@ -15,7 +15,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     client_secret=SPOTIFY_CLIENT_SECRET,
     redirect_uri=SPOTIFY_REDIRECT_URI,
     scope="user-modify-playback-state",
-    cache_path="/home/botuser/phantombot2/scripts/custom/.spotify_cache"
+    cache_path="/home/botuser/phantombot-junky/scripts/custom/.spotify_cache"
 ))
 
 def extract_spotify_id(url):
