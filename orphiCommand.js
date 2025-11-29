@@ -44,13 +44,22 @@
         $.log.error('Fehler beim Laden des Zählers: ' + e);
     }
 
+    var messages = [
+        "Orphi war schon {count} Mal da!"
+    ];
+
+    function getRandomMessage(count) {
+        var message = messages[Math.floor(Math.random() * messages.length)];
+        return message.replace("{count}", count);
+    }
+
     // Sicherstellen, dass das Script korrekt geladen wurde
     $.bind('initReady', function () {
         if ($.registerChatCommand && $.say) {
             $.registerChatCommand('./custom/orphiCommand.js', 'orphi', $.PERMISSION.Viewer);
             $.log.error('🚀 Orphi Command Skript erfolgreich initialisiert.');
         } else {
-            $.log.error('❌ Fehler: Orphi Command Skript Funktion nicht verfügbar');
+            $.log.error('❌ Fehler: Orphi Command Skript Funktion nicht verfügbar!');
         }
     });
 
@@ -72,7 +81,7 @@
                     lastTimestamp = currentTimestamp; // Zeitstempel aktualisieren
                     saveToFile(filePath, commandCount + ',' + lastTimestamp); // Zähler und Zeitstempel speichern
 
-                    $.say('Orphi war bereits ' + commandCount + ' Mal hier!');
+                    $.say('/me ' + getRandomMessage(commandCount));
                 } else {
                     var remainingTime = 43200000 - timeDifference;
                     var remainingHours = Math.floor(remainingTime / 3600000);
