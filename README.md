@@ -1,61 +1,104 @@
-# Phantombot - Spotify
+# PhantomBot - Spotify Integration
 
-Ein kleines Skript zur Verbindung vom Twitchbot 'Phantombot' mit Spotify, wodurch die Nutzung der `!spotify` und `!spotifyAuth` Befehle ermöglicht wird.
+A script that connects the Twitch bot [PhantomBot](https://phantombot.github.io/) with Spotify, enabling `!spotify` and `!spotifyAuth` commands for song requests.
 
-## Spotify API Daten
+## Bot Details
 
-Für die Nutzung des Spotify-Features werden Spotify API-Daten benötigt. Diese Daten müssen in einer Datei namens `./addons/spotifyConfig.json` im folgenden Format gespeichert werden:
+- **Bot User:** `KonzuBot`
+- **Twitch Channel:** [yellow_junky](https://www.twitch.tv/yellow_junky)
+
+---
+
+## Configuration
+
+### Spotify API Credentials
+
+Create a file at `./addons/spotifyConfig.json`:
 
 ```json
 {
     "filePath": "./addons/spotifyAccountCode.txt",
     "tokenFilePath": "./addons/spotifyTokens.json",
-    "clientId": "12345678901234567890",
-    "clientSecret": "12345678901234567890",
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET",
     "redirectUri": "https://127.0.0.1:8888/callback"
 }
 ```
 
-## Language Daten
+### Language File
 
-Für die Übersetzung von Texten wird eine Sprachdatei benötigt. Die Texte müssen in einer Datei namens `./addons/spotifyLang.json` im folgenden Format gespeichert werden:
+Create a file at `./addons/spotifyLang.json` for customizable chat messages:
 
 ```json
 {
     "song_added": "✅ '{{track}}' - {{artist}}",
     "song_added_simple": "✅ +1",
     "invalid_link": "❌ Format: https://open.spotify.com/intl-de/track/...",
-    "add_to_queue_exception": "❌ Es gab ein Problem beim Hinzufügen zur Warteschlange.",
+    "add_to_queue_exception": "❌ There was a problem adding to the queue.",
     "auth_link": "🔗 Spotify Auth Link: {{url}}",
-    "auth_saved": "🔐 Auth-Code erfolgreich gespeichert.",
-    "auth_hint": "🔑 Bitte autorisiere dein Spotify-Konto mit !spotifyAuth <code>",
+    "auth_saved": "🔐 Auth code saved successfully.",
+    "auth_hint": "🔑 Please authorize your Spotify account with !spotifyAuth <code>",
     "error": "❌ Error: {{error}}",
-    "invalid_permission": "❌ Du musst ein Moderator sein, um diesen Befehl zu benutzen!",
-    "song_null": "❌ No Song Sadge",
-    "song_current": "🎶 {{track}} - {{artist}}"
+    "invalid_permission": "❌ You must be a moderator to use this command!",
+    "song_null": "❌ No song playing",
+    "song_current": "🎶 {{track}} - {{artist}}",
+    "song_too_long": "⏱️ '{{track}}' by {{artist}} is too long ({{duration}} min). Maximum is 10 minutes."
 }
 ```
 
-### Wie man die API-Daten erhält:
+---
 
-1. Gehe auf [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications).
-2. Melde dich mit deinem Spotify-Konto an.
-3. Erstelle eine neue Anwendung, um deine `clientId` und `clientSecret` zu erhalten.
-4. Verwende die `redirectUri` deiner Wahl, z. B. `https://127.0.0.1:8888/callback` für lokale Tests.
-5. Wichtig: Im Dev Portal muss ein Nutzer für die Spotify-Email zur App hinzugefügt werden.
+## Setup Guide
 
-## Einrichtungsprozess
+### Step 1: Create Spotify App
 
-Um Phantombot mit Spotify zu verbinden, befolge die folgenden Schritte:
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/applications)
+2. Log in with your Spotify account
+3. Create a new application to get your `clientId` and `clientSecret`
+4. Set a `redirectUri` (e.g., `https://127.0.0.1:8888/callback` for local testing)
+5. **Important:** Add the Spotify account email as a user in the app's "User Management" section
 
-1. Gib im Twitch-Chat den Befehl `!spotifyAuth` ein, um den Link zur Spotify-Freigabe zu erhalten.
-2. Gehe auf den Link und autorisiere die Anwendung.
-3. Kopiere den erhaltenen Code aus der Weiterleitungs-URL.
-4. Füge den Code entweder manuell in die Datei `./addons/spotifyAccountCode.txt` ein oder verwende den Befehl `!spotifyAuth <code>`, um den Code direkt zu setzen.
-5. Wenn alles erfolgreich war, kannst du nun mit dem Befehl `!spotify <track_url>` Tracks in die Warteschlange stellen. Zum Beispiel:
+### Step 2: Connect PhantomBot to Spotify
 
-`!spotify https://open.spotify.com/intl-de/track/2PnlsTsOTLE5jnBnNe2K0A?si=824aa38c87364da5`
+1. Type `!spotifyAuth` in Twitch chat to get the authorization link
+2. Open the link and authorize the application
+3. Copy the code from the redirect URL
+4. Either:
+   - Manually paste it into `./addons/spotifyAccountCode.txt`, or
+   - Use `!spotifyAuth <code>` in chat
 
-Dies fügt den angegebenen Track zur Spotify-Warteschlange hinzu.
+### Step 3: Use It!
 
-Viel Spaß beim Musikhören! 🎶
+Add songs to the queue:
+
+```
+!spotify https://open.spotify.com/track/2PnlsTsOTLE5jnBnNe2K0A
+```
+
+Or search by name:
+
+```
+!spotify Never Gonna Give You Up
+```
+
+---
+
+## Available Commands
+
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `!song` | Everyone | Shows the currently playing song |
+| `!queue` | Everyone | Shows upcoming songs in the queue |
+| `!spotify <link/search>` | Moderators | Adds a song to the queue |
+| `!spotifyAuth` | Moderators | Initiates Spotify OAuth flow |
+| `!spotifyAuth <code>` | Moderators | Saves the OAuth authorization code |
+
+---
+
+## Notes
+
+- Songs longer than 10 minutes are automatically rejected
+- The Spotify API integration handles token refresh automatically
+- For issues, check the logs at `/home/botuser/phantombot-junky/logs/js-error/YYYY-MM-DD.txt`
+
+Happy listening! 🎶

@@ -1,18 +1,18 @@
-# PhantomBot Spotify Song Request Skript
+# PhantomBot Spotify Song Request Script
 
-## Projektübersicht
+## Project Overview
 
-Dies ist ein **Spotify-API-Musikbot-Skript**, das über [PhantomBot](https://phantombot.github.io/) läuft. Es ermöglicht Twitch-Zuschauern, Songs über Spotify-Links oder Suchbegriffe zur Warteschlange hinzuzufügen.
+This is a **Spotify API music bot script** that runs on [PhantomBot](https://phantombot.github.io/). It allows Twitch viewers to add songs to the queue via Spotify links or search terms.
 
-**Bot-Details:**
-- Bot-User: `KonzuBot`
-- Twitch-Kanal: [yellow_junky](https://www.twitch.tv/yellow_junky)
+**Bot Details:**
+- Bot User: `KonzuBot`
+- Twitch Channel: [yellow_junky](https://www.twitch.tv/yellow_junky)
 
 ---
 
 ## Service Management
 
-Der PhantomBot läuft als Systemd-Service und kann wie folgt verwaltet werden:
+PhantomBot runs as a systemd service and can be managed as follows:
 
 ```bash
 service phantombot-junky status
@@ -25,23 +25,23 @@ service phantombot-junky start
 
 ## Logging & Debugging
 
-### Haupt-Logdatei
-Die Logs der Skript-Ausführung befinden sich unter:
+### Main Log File
+Script execution logs are located at:
 ```
 /home/botuser/phantombot-junky/logs/js-error/YYYY-MM-DD.txt
 ```
 
-**Beispiel-Logeinträge:**
+**Example log entries:**
 ```
 [02-23-2026 @ 05:00:22.735 GMT] [songRequest.js:408] 🚀 Spotify Song Request Skript erfolgreich initialisiert.
 [02-23-2026 @ 05:00:19.415 GMT] [heizoelCommand.js:92] 🛢 Heizölpreis-Checker geladen. Nutze !heizöl im Chat.
 ```
 
-> **Wichtig:** Für dieses Skript sind nur die Einträge von `songRequest.js` relevant.
+> **Note:** Only entries from `songRequest.js` are relevant for this script.
 
-### Eigene Log-Funktion (für Tests)
+### Custom Log Function (for Testing)
 
-Das Skript verfügt über eine eigene Logging-Funktion für Testzwecke:
+The script has its own logging function for testing purposes:
 
 ```javascript
 function log(type, message) {
@@ -54,39 +54,39 @@ function log(type, message) {
 }
 ```
 
-**Log-Dateipfad:** `/home/botuser/phantombot-junky/logs/spotify/YYYY-MM-DD.txt`
+**Log file path:** `/home/botuser/phantombot-junky/logs/spotify/YYYY-MM-DD.txt`
 
-> ⚠️ **WICHTIG:** Diese `log()` Funktion soll **ausschließlich** zum Testen von neuen Features verwendet werden. Keine andere interne Logging-Methode nutzen!
+> ⚠️ **IMPORTANT:** This `log()` function should be used **exclusively** for testing new features. Do not use any other internal logging methods!
 
 ---
 
-## Technische Besonderheiten
+## Technical Details
 
 ### Rhino JavaScript Engine (Java + JavaScript Hybrid)
 
-PhantomBot verwendet die **Rhino JavaScript Engine**, was bedeutet, dass der Code eine Mischung aus JavaScript und Java ist. Dies erfordert spezielle Syntax:
+PhantomBot uses the **Rhino JavaScript Engine**, meaning the code is a mix of JavaScript and Java. This requires special syntax:
 
-- Java-Klassen werden über `Packages` oder `java` referenziert
-- Beispiel: `new java.io.File()`, `new java.text.SimpleDateFormat()`
-- HTTP-Requests nutzen PhantomBot's interne HttpClient-API:
+- Java classes are referenced via `Packages` or `java`
+- Example: `new java.io.File()`, `new java.text.SimpleDateFormat()`
+- HTTP requests use PhantomBot's internal HttpClient API:
   ```javascript
   let uri = Packages.com.gmt2001.httpclient.URIUtil.create(url);
   let headers = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
   let response = Packages.com.gmt2001.httpclient.HttpClient.get(uri, headers);
   ```
 
-### Konfigurationsdateien
+### Configuration Files
 
-| Datei | Pfad | Beschreibung |
-|-------|------|--------------|
-| Spotify Config | `/home/botuser/phantombot-junky/addons/spotifyConfig.json` | API-Credentials, Redirect-URI |
-| Spotify Tokens | `/home/botuser/phantombot-junky/addons/spotifyTokens.json` | Access/Refresh Tokens |
-| Übersetzungen | `/home/botuser/phantombot-junky/addons/spotifyLang.json` | Sprachstrings für Chat-Ausgaben |
-| Account Code | `/home/botuser/phantombot-junky/addons/spotifyAccountCode.txt` | OAuth-Authorization-Code |
+| File | Path | Description |
+|------|------|-------------|
+| Spotify Config | `/home/botuser/phantombot-junky/addons/spotifyConfig.json` | API credentials, redirect URI |
+| Spotify Tokens | `/home/botuser/phantombot-junky/addons/spotifyTokens.json` | Access/Refresh tokens |
+| Translations | `/home/botuser/phantombot-junky/addons/spotifyLang.json` | Language strings for chat output |
+| Account Code | `/home/botuser/phantombot-junky/addons/spotifyAccountCode.txt` | OAuth authorization code |
 
-### Übersetzungssystem
+### Translation System
 
-Texte werden übersetzbar in einer JSON-Datei gespeichert:
+Texts are stored translatable in a JSON file:
 
 ```javascript
 var lang = loadConfig("./addons/spotifyLang.json");
@@ -106,56 +106,56 @@ function translate(key, replacements) {
 
 ## Spotify API Integration
 
-> ✅ **Die Spotify API Config, Verbindung und Token-Erneuerung funktionieren bereits und sollen NICHT angepasst werden!**
+> ✅ **The Spotify API config, connection, and token refresh are already working and should NOT be modified!**
 
-### Verfügbare Chat-Befehle
+### Available Chat Commands
 
-| Befehl | Berechtigung | Beschreibung |
-|--------|--------------|--------------|
-| `!song` | Alle User | Zeigt den aktuell gespielten Song |
-| `!queue` | Alle User | Zeigt die nächsten Songs in der Warteschlange |
-| `!spotify <link/suche>` | Mods | Fügt einen Song zur Queue hinzu |
-| `!spotifyAuth` | Mods | Startet OAuth-Flow für Spotify |
-
----
-
-## Helper-Funktionen
-
-Das Skript enthält mehrere Helper-Funktionen für verschiedene Aufgaben:
-
-- `convertToBase64(input)` - Base64-Kodierung
-- `readFromFile(path)` - Datei lesen
-- `saveToFile(path, data)` - Datei schreiben
-- `loadConfig(path)` - JSON-Datei laden und parsen
-- `loadTokens()` / `saveTokens()` - Token-Management
-- `extractSpotifyId(url)` - Track-ID aus URL extrahieren
-- `createLogFolder()` / `getLogFileName()` / `log()` - Logging-Utilities
-- `getTrackInfo(trackId)` - Track-Infos von API abrufen
-- `getCurrentTrack()` - Aktuell spielender Track
-- `getUpcomingTracks()` - Queue-Vorschau
-- `addToQueue(spotifyInput, sender)` - Song zur Queue hinzufügen
-- `refreshAccessToken()` / `requestAccessToken(code)` - OAuth-Token-Management
+| Command | Permission | Description |
+|---------|------------|-------------|
+| `!song` | All Users | Shows the currently playing song |
+| `!queue` | All Users | Shows upcoming songs in the queue |
+| `!spotify <link/search>` | Mods | Adds a song to the queue |
+| `!spotifyAuth` | Mods | Initiates OAuth flow for Spotify |
 
 ---
 
-## Wichtige Hinweise für Änderungen
+## Helper Functions
 
-### Sonderfälle nicht ändern
+The script contains several helper functions for various tasks:
 
-Manche "Sonderfälle" im Code sind bewusst so implementiert und sollen **nicht** geändert werden:
+- `convertToBase64(input)` - Base64 encoding
+- `readFromFile(path)` - Read file
+- `saveToFile(path, data)` - Write file
+- `loadConfig(path)` - Load and parse JSON file
+- `loadTokens()` / `saveTokens()` - Token management
+- `extractSpotifyId(url)` - Extract track ID from URL
+- `createLogFolder()` / `getLogFileName()` / `log()` - Logging utilities
+- `getTrackInfo(trackId)` - Fetch track info from API
+- `getCurrentTrack()` - Currently playing track
+- `getUpcomingTracks()` - Queue preview
+- `addToQueue(spotifyInput, sender)` - Add song to queue
+- `refreshAccessToken()` / `requestAccessToken(code)` - OAuth token management
+
+---
+
+## Important Notes for Changes
+
+### Do Not Modify Special Cases
+
+Some "special cases" in the code are intentionally implemented and should **not** be changed:
 
 ```javascript
 loadTokens(); // Doppelt hält besser
 ```
 
-Diese Kommentare markieren bewusste Design-Entscheidungen.
+These comments mark deliberate design decisions.
 
-### Song-Längen-Limit
+### Song Duration Limit
 
-Songs länger als 10 Minuten (600.000ms) werden nicht hinzugefügt:
+Songs longer than 10 minutes (600,000ms) are not added:
 ```javascript
 if (trackInfo && trackInfo.duration >= 600000) {
-    // Song wird abgelehnt
+    // Song is rejected
 }
 ```
 
@@ -163,13 +163,13 @@ if (trackInfo && trackInfo.duration >= 600000) {
 
 ## Git Commit Standards
 
-Bei Commits in dieses Repository halten wir uns an die **Conventional Commits** Spezifikation:
+When committing to this repository, we follow the **Conventional Commits** specification:
 
 ```
 <type>(<scope>): <description>
 ```
 
-**Beispiele:**
+**Examples:**
 ```
 fix(api): adjusted endpoint configuration
 feat(queue): added song duration limit
@@ -178,30 +178,30 @@ refactor(log): improved logging function
 ```
 
 **Types:**
-- `feat` - Neue Features
-- `fix` - Bugfixes
-- `docs` - Dokumentation
-- `refactor` - Code-Refactoring
+- `feat` - New features
+- `fix` - Bug fixes
+- `docs` - Documentation
+- `refactor` - Code refactoring
 - `test` - Tests
-- `chore` - Wartung, Build-Änderungen
+- `chore` - Maintenance, build changes
 
 ---
 
-## Dateistruktur
+## File Structure
 
 ```
 /home/botuser/phantombot-junky/
 ├── scripts/
 │   └── custom/
-│       ├── songRequest.js      # Hauptskript (dieses Repository)
+│       ├── songRequest.js      # Main script (this repository)
 │       ├── .gitignore
-│       ├── .git/               # Git-Repository
-│       └── AGENTS.md           # Diese Datei
+│       ├── .git/               # Git repository
+│       └── AGENTS.md           # This file
 ├── addons/
-│   ├── spotifyConfig.json      # API-Konfiguration
-│   ├── spotifyTokens.json      # OAuth-Tokens
-│   ├── spotifyLang.json        # Übersetzungen
-│   └── spotifyAccountCode.txt  # Auth-Code
+│   ├── spotifyConfig.json      # API configuration
+│   ├── spotifyTokens.json      # OAuth tokens
+│   ├── spotifyLang.json        # Translations
+│   └── spotifyAccountCode.txt  # Auth code
 └── logs/
-    ├── js-error/               # PhantomBot Logs
-    └── spotify/                # Eigene Spotify-Logs
+    ├── js-error/               # PhantomBot logs
+    └── spotify/                # Custom Spotify logs
