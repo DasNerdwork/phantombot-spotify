@@ -2,13 +2,6 @@
 
 A script that connects the Twitch bot [PhantomBot](https://phantombot.github.io/) with Spotify, enabling `!spotify` and `!spotifyAuth` commands for song requests.
 
-## Bot Details
-
-- **Bot User:** `KonzuBot`
-- **Twitch Channel:** [yellow_junky](https://www.twitch.tv/yellow_junky)
-
----
-
 ## Configuration
 
 ### Spotify API Credentials
@@ -56,7 +49,7 @@ Create a file at `./addons/spotifyLang.json` for customizable chat messages:
 2. Log in with your Spotify account
 3. Create a new application to get your `clientId` and `clientSecret`
 4. Set a `redirectUri` (e.g., `https://127.0.0.1:8888/callback` for local testing)
-5. **Important:** Add the Spotify account email as a user in the app's "User Management" section
+5. **Important:** Add the **users spotify account email** as a user in the app's "User Management" section
 
 ### Step 2: Connect PhantomBot to Spotify
 
@@ -99,6 +92,6 @@ Or search by name:
 
 - Songs longer than 10 minutes are automatically rejected
 - The Spotify API integration handles token refresh automatically
-- For issues, check the logs at `/home/botuser/phantombot-junky/logs/js-error/YYYY-MM-DD.txt`
+- For issues, check the logs at `./logs/js-error/YYYY-MM-DD.txt`
 
 Happy listening! 🎶

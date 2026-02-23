@@ -34,7 +34,6 @@ Script execution logs are located at:
 **Example log entries:**
 ```
 [02-23-2026 @ 05:00:22.735 GMT] [songRequest.js:408] 🚀 Spotify Song Request Skript erfolgreich initialisiert.
-[02-23-2026 @ 05:00:19.415 GMT] [heizoelCommand.js:92] 🛢 Heizölpreis-Checker geladen. Nutze !heizöl im Chat.
 ```
 
 > **Note:** Only entries from `songRequest.js` are relevant for this script.
