@@ -283,9 +283,9 @@
             }
 
             if (apiResponse && apiResponse.queue && apiResponse.queue.length > 0) {
-                for (var i = 1; i < Math.min(5, apiResponse.queue.length); i++) {
+                for (var i = 0; i < Math.min(4, apiResponse.queue.length); i++) {
                     let track = apiResponse.queue[i];
-                    queuePreview.push((i+1) + ". " + track.name + " - " + track.artists[0].name);
+                    queuePreview.push((i+2) + ". " + track.name + " - " + track.artists[0].name);
                 }
             } else {
                 queuePreview.push("ℹ️ Keine weiteren Tracks in der Warteschlange sichtbar.");
