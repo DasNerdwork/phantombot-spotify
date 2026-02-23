@@ -15,6 +15,7 @@
     // Initialisierung der Variablen aus der Konfiguration
     var filePath = config.filePath || './addons/spotifyAccountCode.txt';
     var tokenFilePath = config.tokenFilePath || './addons/spotifyTokens.json';
+    var blacklistFilePath = config.blacklistFilePath || './addons/spotifyBlacklist.json';
     var CLIENT_ID = config.clientId;
     var CLIENT_SECRET = config.clientSecret;
     var BASE64_CODE = convertToBase64(CLIENT_ID + ":" + CLIENT_SECRET);
@@ -89,6 +90,166 @@
             expires_at: expiresAt
         });
         saveToFile(tokenFilePath, data);
+    }
+
+    // --- Blacklist Funktionen ---
+    /**
+     * Lädt die Blacklist aus der Datei
+     * @returns {Object} - Blacklist-Objekt mit blockedTracks und blockedArtists Arrays
+     */
+    function loadBlacklist() {
+        var json = readFromFile(blacklistFilePath);
+        if (json) {
+            try {
+                return JSON.parse(json);
+            } catch (e) {
+                log("error", "❌ Fehler beim Parsen der Blacklist: " + e.message);
+            }
+        }
+        return { blockedTracks: [], blockedArtists: [] };
+    }
+
+    /**
+     * Speichert die Blacklist in die Datei
+     * @param {Object} blacklist - Das Blacklist-Objekt
+     */
+    function saveBlacklist(blacklist) {
+        saveToFile(blacklistFilePath, JSON.stringify(blacklist, null, 2));
+    }
+
+    /**
+     * Prüft ob ein Track oder Artist auf der Blacklist steht
+     * @param {string} trackId - Die Spotify Track ID
+     * @param {string} artistName - Der Name des Künstlers
+     * @returns {Object} - { blocked: boolean, reason: string }
+     */
+    function isBlacklisted(trackId, artistName) {
+        var blacklist = loadBlacklist();
+        
+        // Prüfe ob Track-ID blockiert ist
+        for (var i = 0; i < blacklist.blockedTracks.length; i++) {
+            if (blacklist.blockedTracks[i].id === trackId) {
+                return { blocked: true, reason: "Song '" + blacklist.blockedTracks[i].name + "' ist blockiert" };
+            }
+        }
+        
+        // Prüfe ob Artist blockiert ist (Case-Insensitive)
+        var artistLower = artistName.toLowerCase();
+        for (var j = 0; j < blacklist.blockedArtists.length; j++) {
+            if (artistLower === blacklist.blockedArtists[j].name.toLowerCase()) {
+                return { blocked: true, reason: "Artist '" + blacklist.blockedArtists[j].name + "' ist blockiert" };
+            }
+        }
+        
+        return { blocked: false, reason: null };
+    }
+
+    /**
+     * Fügt einen Track zur Blacklist hinzu
+     * @param {string} trackId - Die Spotify Track ID
+     * @param {string} trackName - Der Name des Tracks
+     * @param {string} artistName - Der Name des Künstlers
+     */
+    function addTrackToBlacklist(trackId, trackName, artistName) {
+        var blacklist = loadBlacklist();
+        
+        // Prüfe ob bereits vorhanden
+        for (var i = 0; i < blacklist.blockedTracks.length; i++) {
+            if (blacklist.blockedTracks[i].id === trackId) {
+                return false; // Bereits vorhanden
+            }
+        }
+        
+        blacklist.blockedTracks.push({
+            id: trackId,
+            name: trackName,
+            artist: artistName
+        });
+        saveBlacklist(blacklist);
+        return true;
+    }
+
+    /**
+     * Entfernt einen Track von der Blacklist
+     * @param {string} trackId - Die Spotify Track ID
+     */
+    function removeTrackFromBlacklist(trackId) {
+        var blacklist = loadBlacklist();
+        var initialLength = blacklist.blockedTracks.length;
+        
+        blacklist.blockedTracks = blacklist.blockedTracks.filter(function(track) {
+            return track.id !== trackId;
+        });
+        
+        if (blacklist.blockedTracks.length < initialLength) {
+            saveBlacklist(blacklist);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Fügt einen Artist zur Blacklist hinzu
+     * @param {string} artistName - Der Name des Künstlers
+     */
+    function addArtistToBlacklist(artistName) {
+        var blacklist = loadBlacklist();
+        
+        // Prüfe ob bereits vorhanden (Case-Insensitive)
+        var artistLower = artistName.toLowerCase();
+        for (var i = 0; i < blacklist.blockedArtists.length; i++) {
+            if (blacklist.blockedArtists[i].name.toLowerCase() === artistLower) {
+                return false; // Bereits vorhanden
+            }
+        }
+        
+        blacklist.blockedArtists.push({ name: artistName });
+        saveBlacklist(blacklist);
+        return true;
+    }
+
+    /**
+     * Entfernt einen Artist von der Blacklist
+     * @param {string} artistName - Der Name des Künstlers
+     */
+    function removeArtistFromBlacklist(artistName) {
+        var blacklist = loadBlacklist();
+        var initialLength = blacklist.blockedArtists.length;
+        var artistLower = artistName.toLowerCase();
+        
+        blacklist.blockedArtists = blacklist.blockedArtists.filter(function(artist) {
+            return artist.name.toLowerCase() !== artistLower;
+        });
+        
+        if (blacklist.blockedArtists.length < initialLength) {
+            saveBlacklist(blacklist);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Zeigt die aktuelle Blacklist an
+     */
+    function showBlacklist() {
+        var blacklist = loadBlacklist();
+        var message = [];
+        
+        if (blacklist.blockedArtists.length > 0) {
+            var artists = blacklist.blockedArtists.map(function(a) { return a.name; }).join(", ");
+            message.push("🚫 Blockierte Artists: " + artists);
+        } else {
+            message.push("🚫 Keine Artists blockiert");
+        }
+        
+        if (blacklist.blockedTracks.length > 0) {
+            var tracks = blacklist.blockedTracks.map(function(t) { return t.name + " (" + t.artist + ")"; }).join(", ");
+            message.push("🎵 Blockierte Songs: " + tracks);
+        } else {
+            message.push("🎵 Keine Songs blockiert");
+        }
+        
+        $.say(message.join(" | "));
     }
   
     // Regex zum extrahieren des ID Parts der Spotify URL
@@ -210,6 +371,14 @@
         if (!trackInfo) {
             log("error", "❌ Konnte Track-Infos nicht abrufen.");
             $.say(translate("invalid_link"));
+            return;
+        }
+
+        // Blacklist-Prüfung
+        var blacklistCheck = isBlacklisted(trackId, trackInfo.artistName);
+        if (blacklistCheck.blocked) {
+            log("info", "🚫 Blockierter Song/Artist: " + blacklistCheck.reason);
+            $.say($.whisperPrefix(sender) + "🚫 Dieser " + blacklistCheck.reason + " und kann nicht angefordert werden.");
             return;
         }
 
@@ -403,6 +572,7 @@
         $.registerChatCommand('./custom/songRequest.js', 'spotifyauth', $.PERMISSION.Mod);
         $.registerChatCommand('./custom/songRequest.js', 'song', $.PERMISSION.User);
         $.registerChatCommand('./custom/songRequest.js', 'queue', $.PERMISSION.User);
+        $.registerChatCommand('./custom/songRequest.js', 'sblock', $.PERMISSION.Mod);
         loadTokens(); // Doppelt hält besser
         log("info",'🚀 Spotify Song Request Skript erfolgreich initialisiert.');
         $.log.error('🚀 Spotify Song Request Skript erfolgreich initialisiert.');
@@ -464,6 +634,102 @@
         if (command.equalsIgnoreCase("queue")) {
             getUpcomingTracks();
             var currentTrack = getCurrentTrack();
+        }
+
+        if (command.equalsIgnoreCase("sblock")) {
+            if (!$.checkUserPermission(sender, tags, $.PERMISSION.Mod)) {
+                $.say($.whisperPrefix(sender) + translate("invalid_permission"));
+                return;
+            }
+
+            if (args.length === 0) {
+                $.say($.whisperPrefix(sender) + "Verwendung: !sblock list | artist <Name> | song <Spotify-URL> | remove artist <Name> | remove song <Spotify-URL>");
+                return;
+            }
+
+            var subCommand = args[0].toLowerCase();
+
+            if (subCommand === "list") {
+                showBlacklist();
+                return;
+            }
+
+            if (subCommand === "artist") {
+                if (args.length < 2) {
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock artist <Artist-Name>");
+                    return;
+                }
+                var artistName = args.slice(1).join(" ");
+                if (addArtistToBlacklist(artistName)) {
+                    log("info", "🚫 Artist '" + artistName + "' zur Blacklist hinzugefügt.");
+                    $.say($.whisperPrefix(sender) + "🚫 Artist '" + artistName + "' wurde blockiert.");
+                } else {
+                    $.say($.whisperPrefix(sender) + "⚠️ Artist '" + artistName + "' ist bereits blockiert.");
+                }
+                return;
+            }
+
+            if (subCommand === "song") {
+                if (args.length < 2) {
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock song <Spotify-URL>");
+                    return;
+                }
+                var spotifyUrl = args[1];
+                var trackId = extractSpotifyId(spotifyUrl);
+                if (!trackId) {
+                    $.say($.whisperPrefix(sender) + "❌ Ungültige Spotify-URL.");
+                    return;
+                }
+                var trackInfo = getTrackInfo(trackId);
+                if (!trackInfo) {
+                    $.say($.whisperPrefix(sender) + "❌ Konnte Track-Infos nicht abrufen.");
+                    return;
+                }
+                if (addTrackToBlacklist(trackId, trackInfo.trackName, trackInfo.artistName)) {
+                    log("info", "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " zur Blacklist hinzugefügt.");
+                    $.say($.whisperPrefix(sender) + "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde blockiert.");
+                } else {
+                    $.say($.whisperPrefix(sender) + "⚠️ Dieser Song ist bereits blockiert.");
+                }
+                return;
+            }
+
+            if (subCommand === "remove") {
+                if (args.length < 3) {
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock remove artist <Name> | !sblock remove song <Spotify-URL>");
+                    return;
+                }
+                var removeType = args[1].toLowerCase();
+                
+                if (removeType === "artist") {
+                    var artistToRemove = args.slice(2).join(" ");
+                    if (removeArtistFromBlacklist(artistToRemove)) {
+                        log("info", "✅ Artist '" + artistToRemove + "' von der Blacklist entfernt.");
+                        $.say($.whisperPrefix(sender) + "✅ Artist '" + artistToRemove + "' wurde entblockiert.");
+                    } else {
+                        $.say($.whisperPrefix(sender) + "⚠️ Artist '" + artistToRemove + "' war nicht blockiert.");
+                    }
+                    return;
+                }
+
+                if (removeType === "song") {
+                    var songUrl = args[2];
+                    var songTrackId = extractSpotifyId(songUrl);
+                    if (!songTrackId) {
+                        $.say($.whisperPrefix(sender) + "❌ Ungültige Spotify-URL.");
+                        return;
+                    }
+                    if (removeTrackFromBlacklist(songTrackId)) {
+                        log("info", "✅ Song von der Blacklist entfernt.");
+                        $.say($.whisperPrefix(sender) + "✅ Song wurde entblockiert.");
+                    } else {
+                        $.say($.whisperPrefix(sender) + "⚠️ Dieser Song war nicht blockiert.");
+                    }
+                    return;
+                }
+            }
+
+            $.say($.whisperPrefix(sender) + "Unbekannter Befehl. Verwendung: !sblock list | artist <Name> | song <URL> | remove artist <Name> | remove song <URL>");
         }
     });
 
