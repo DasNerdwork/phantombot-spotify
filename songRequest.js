@@ -647,14 +647,12 @@
                 return;
             }
 
-            var subCommand = args[0].toLowerCase();
-
-            if (subCommand === "list") {
+            if (args[0].equalsIgnoreCase("list")) {
                 showBlacklist();
                 return;
             }
 
-            if (subCommand === "artist") {
+            if (args[0].equalsIgnoreCase("artist")) {
                 if (args.length < 2) {
                     $.say($.whisperPrefix(sender) + "Verwendung: !sblock artist <Artist-Name>");
                     return;
@@ -669,7 +667,7 @@
                 return;
             }
 
-            if (subCommand === "song") {
+            if (args[0].equalsIgnoreCase("song")) {
                 if (args.length < 2) {
                     $.say($.whisperPrefix(sender) + "Verwendung: !sblock song <Spotify-URL>");
                     return;
@@ -694,14 +692,13 @@
                 return;
             }
 
-            if (subCommand === "remove") {
+            if (args[0].equalsIgnoreCase("remove")) {
                 if (args.length < 3) {
                     $.say($.whisperPrefix(sender) + "Verwendung: !sblock remove artist <Name> | !sblock remove song <Spotify-URL>");
                     return;
                 }
-                var removeType = args[1].toLowerCase();
                 
-                if (removeType === "artist") {
+                if (args[1].equalsIgnoreCase("artist")) {
                     var artistToRemove = args.slice(2).join(" ");
                     if (removeArtistFromBlacklist(artistToRemove)) {
                         log("info", "✅ Artist '" + artistToRemove + "' von der Blacklist entfernt.");
@@ -712,7 +709,7 @@
                     return;
                 }
 
-                if (removeType === "song") {
+                if (args[1].equalsIgnoreCase("song")) {
                     var songUrl = args[2];
                     var songTrackId = extractSpotifyId(songUrl);
                     if (!songTrackId) {
