@@ -78,10 +78,22 @@ PhantomBot uses the **Rhino JavaScript Engine**, meaning the code is a mix of Ja
 
 | File | Path | Description |
 |------|------|-------------|
-| Spotify Config | `/home/botuser/phantombot-junky/addons/spotifyConfig.json` | API credentials, redirect URI |
+| Spotify Config | `/home/botuser/phantombot-junky/addons/spotifyConfig.json` | API credentials, redirect URI, display settings |
 | Spotify Tokens | `/home/botuser/phantombot-junky/addons/spotifyTokens.json` | Access/Refresh tokens |
 | Translations | `/home/botuser/phantombot-junky/addons/spotifyLang.json` | Language strings for chat output |
 | Account Code | `/home/botuser/phantombot-junky/addons/spotifyAccountCode.txt` | OAuth authorization code |
+
+### Config Options (spotifyConfig.json)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `clientId` | string | *required* | Spotify API Client ID |
+| `clientSecret` | string | *required* | Spotify API Client Secret |
+| `redirectUri` | string | `https://127.0.0.1:8888/callback` | OAuth redirect URI |
+| `filePath` | string | `./addons/spotifyAccountCode.txt` | Path to auth code file |
+| `tokenFilePath` | string | `./addons/spotifyTokens.json` | Path to tokens file |
+| `blacklistFilePath` | string | `./addons/spotifyBlacklist.json` | Path to blacklist file |
+| `maxArtistsDisplay` | number | `3` | Maximum number of artists to display (additional artists shown as "& X more") |
 
 ### Translation System
 

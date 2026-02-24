@@ -14,9 +14,21 @@ Create a file at `./addons/spotifyConfig.json`:
     "tokenFilePath": "./addons/spotifyTokens.json",
     "clientId": "YOUR_CLIENT_ID",
     "clientSecret": "YOUR_CLIENT_SECRET",
-    "redirectUri": "https://127.0.0.1:8888/callback"
+    "redirectUri": "https://127.0.0.1:8888/callback",
+    "maxArtistsDisplay": 3
 }
 ```
+
+#### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `clientId` | string | *required* | Spotify API Client ID |
+| `clientSecret` | string | *required* | Spotify API Client Secret |
+| `redirectUri` | string | `https://127.0.0.1:8888/callback` | OAuth redirect URI |
+| `filePath` | string | `./addons/spotifyAccountCode.txt` | Path to auth code file |
+| `tokenFilePath` | string | `./addons/spotifyTokens.json` | Path to tokens file |
+| `maxArtistsDisplay` | number | `3` | Max artists to display (additional shown as "& X more") |
 
 ### Language File
 
@@ -35,9 +47,19 @@ Create a file at `./addons/spotifyLang.json` for customizable chat messages:
     "invalid_permission": "❌ You must be a moderator to use this command!",
     "song_null": "❌ No song playing",
     "song_current": "🎶 {{track}} - {{artist}}",
-    "song_too_long": "⏱️ '{{track}}' by {{artist}} is too long ({{duration}} min). Maximum is 10 minutes."
+    "song_too_long": "⏱️ '{{track}}' by {{artist}} is too long ({{duration}} min). Maximum is 10 minutes.",
+    "artists_more": " & {{count}} more"
 }
 ```
+
+#### Language String Options
+
+| Key | Placeholders | Description |
+|-----|--------------|-------------|
+| `song_added` | `{{track}}`, `{{artist}}` | Message when song is added to queue |
+| `song_current` | `{{track}}`, `{{artist}}` | Current playing song message |
+| `song_too_long` | `{{track}}`, `{{artist}}`, `{{duration}}` | Song exceeds 10 min limit |
+| `artists_more` | `{{count}}` | Shown when more artists than `maxArtistsDisplay` |
 
 ---
 

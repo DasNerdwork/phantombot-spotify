@@ -20,6 +20,7 @@
     var CLIENT_SECRET = config.clientSecret;
     var BASE64_CODE = convertToBase64(CLIENT_ID + ":" + CLIENT_SECRET);
     var REDIRECT_URI = config.redirectUri || "https://127.0.0.1:8888/callback";
+    var MAX_ARTISTS_DISPLAY = config.maxArtistsDisplay || 3;
     // Initialisierung der Variablen zu Skriptstart
     var ACCESS_TOKEN = null;
     var REFRESH_TOKEN = null;
@@ -27,6 +28,23 @@
     var attempt = 1;
 
     // --- Kleinere Helperfunktionen ---
+    // Extrahiert Künstlernamen aus dem artists-Array und verbindet sie mit Komma
+    // Berücksichtigt das konfigurierte Limit (maxArtistsDisplay)
+    function getArtistNames(artists) {
+        if (!artists || !artists.length) return "";
+        
+        var limitedArtists = artists.slice(0, MAX_ARTISTS_DISPLAY);
+        var names = limitedArtists.map(function(a) { return a.name; }).join(", ");
+        
+        // Wenn mehr Künstler vorhanden sind als angezeigt werden, füge Hinweis hinzu
+        if (artists.length > MAX_ARTISTS_DISPLAY) {
+            var remaining = artists.length - MAX_ARTISTS_DISPLAY;
+            names += translate("artists_more", {count: remaining});
+        }
+        
+        return names;
+    }
+
     // Konvertiert den übergebenen Input in einen Base64 kodierten String.
     function convertToBase64(input) {
         var Base64 = Packages.java.util.Base64;
@@ -326,7 +344,7 @@
         } else if (response.isSuccess()) {
             let apiResponse = JSON.parse($.jsString(response.responseBody()));
             let trackName = apiResponse.name;
-            let artistName = apiResponse.artists[0].name;
+            let artistName = getArtistNames(apiResponse.artists);
             let duration = apiResponse.duration_ms;
             return { trackName, artistName, duration };
         } else {
@@ -467,7 +485,7 @@
 
             if (apiResponse && apiResponse.currently_playing) {
                 let currentTrack = apiResponse.currently_playing;
-                queuePreview.push("🎶 1. " + currentTrack.name + " - " + currentTrack.artists[0].name);
+                queuePreview.push("🎶 1. " + currentTrack.name + " - " + getArtistNames(currentTrack.artists));
             } else {
                 queuePreview.push("❌ Es wird derzeit kein Song gespielt.");
             }
@@ -475,7 +493,7 @@
             if (apiResponse && apiResponse.queue && apiResponse.queue.length > 0) {
                 for (var i = 0; i < Math.min(4, apiResponse.queue.length); i++) {
                     let track = apiResponse.queue[i];
-                    queuePreview.push((i+2) + ". " + track.name + " - " + track.artists[0].name);
+                    queuePreview.push((i+2) + ". " + track.name + " - " + getArtistNames(track.artists));
                 }
             } else {
                 queuePreview.push("ℹ️ Keine weiteren Tracks in der Warteschlange sichtbar.");
@@ -580,7 +598,7 @@
                 return null;
             }
             let trackName = apiResponse.item.name;
-            let artistName = apiResponse.item.artists[0].name;
+            let artistName = getArtistNames(apiResponse.item.artists);
             return { trackName, artistName };
         } else {
             log("error","❌ Fehler beim Abrufen des aktuellen Songs mit Statuscode: " + response.responseCode().code());
