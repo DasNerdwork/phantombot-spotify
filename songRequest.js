@@ -189,6 +189,27 @@
     }
 
     /**
+     * Sucht einen Song in der Blacklist anhand des Namens (Teilmatch)
+     * @param {string} searchTerm - Der Suchbegriff
+     * @returns {Object|null} - Der gefundene Track oder null
+     */
+    function findTrackInBlacklistByName(searchTerm) {
+        var blacklist = loadBlacklist();
+        var searchLower = searchTerm.toLowerCase();
+        
+        for (var i = 0; i < blacklist.blockedTracks.length; i++) {
+            var trackName = blacklist.blockedTracks[i].name.toLowerCase();
+            var artistName = blacklist.blockedTracks[i].artist.toLowerCase();
+            
+            // Teilmatch im Song-Namen oder Artist-Namen
+            if (trackName.indexOf(searchLower) !== -1 || artistName.indexOf(searchLower) !== -1) {
+                return blacklist.blockedTracks[i];
+            }
+        }
+        return null;
+    }
+
+    /**
      * Fügt einen Artist zur Blacklist hinzu
      * @param {string} artistName - Der Name des Künstlers
      */
@@ -643,7 +664,7 @@
             }
 
             if (args.length === 0) {
-                $.say($.whisperPrefix(sender) + "Verwendung: !sblock list | artist <Name> | song <Spotify-URL> | remove artist <Name> | remove song <Spotify-URL>");
+                $.say($.whisperPrefix(sender) + "Verwendung: !sblock list | add artist <Name> | add song <Spotify-URL oder Name> | remove artist <Name> | remove song <Spotify-URL oder Name>");
                 return;
             }
 
@@ -652,76 +673,74 @@
                 return;
             }
 
-            if (args[0].equalsIgnoreCase("artist")) {
-                if (args.length < 2) {
-                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock artist <Artist-Name>");
+            if (args[0].equalsIgnoreCase("add")) {
+                if (args.length < 3) {
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock add artist <Name> | !sblock add song <Spotify-URL oder Name>");
                     return;
                 }
-                var artistName = args.slice(1).join(" ");
-                if (addArtistToBlacklist(artistName)) {
-                    log("info", "🚫 Artist '" + artistName + "' zur Blacklist hinzugefügt.");
-                    $.say($.whisperPrefix(sender) + "🚫 Artist '" + artistName + "' wurde blockiert.");
-                } else {
-                    $.say($.whisperPrefix(sender) + "⚠️ Artist '" + artistName + "' ist bereits blockiert.");
+                
+                if (args[1].equalsIgnoreCase("artist")) {
+                    var artistName = args.slice(2).join(" ");
+                    if (addArtistToBlacklist(artistName)) {
+                        log("info", "🚫 Artist '" + artistName + "' zur Blacklist hinzugefügt.");
+                        $.say($.whisperPrefix(sender) + "🚫 Artist '" + artistName + "' wurde blockiert.");
+                    } else {
+                        $.say($.whisperPrefix(sender) + "⚠️ Artist '" + artistName + "' ist bereits blockiert.");
+                    }
+                    return;
                 }
-                return;
-            }
 
-            if (args[0].equalsIgnoreCase("song")) {
-                if (args.length < 2) {
-                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock song <Spotify-URL oder Song-Name>");
-                    return;
-                }
-                
-                var songInput = args.slice(1).join(" ");
-                var trackId = extractSpotifyId(songInput);
-                
-                // Falls keine Spotify-URL, suche nach dem Song
-                if (!trackId) {
-                    log("info", "🔍 Kein gültiger Spotify-Link erkannt, suche nach: " + songInput);
+                if (args[1].equalsIgnoreCase("song")) {
+                    var songInput = args.slice(2).join(" ");
+                    var trackId = extractSpotifyId(songInput);
                     
-                    if (Date.now() >= EXPIRES_AT) {
-                        refreshAccessToken();
+                    // Falls keine Spotify-URL, suche nach dem Song
+                    if (!trackId) {
+                        log("info", "🔍 Kein gültiger Spotify-Link erkannt, suche nach: " + songInput);
+                        
+                        if (Date.now() >= EXPIRES_AT) {
+                            refreshAccessToken();
+                        }
+                        
+                        var searchUrl = "https://api.spotify.com/v1/search?q=" + encodeURIComponent(songInput) + "&type=track&limit=1";
+                        var searchUri = Packages.com.gmt2001.httpclient.URIUtil.create(searchUrl);
+                        var searchHeaders = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+                        searchHeaders.add("Authorization", "Bearer " + ACCESS_TOKEN);
+                        var searchResponse = Packages.com.gmt2001.httpclient.HttpClient.get(searchUri, searchHeaders);
+                        
+                        if (searchResponse.hasException() || !searchResponse.isSuccess()) {
+                            $.say($.whisperPrefix(sender) + "❌ Fehler bei der Spotify-Suche.");
+                            return;
+                        }
+                        
+                        var searchBody = JSON.parse($.jsString(searchResponse.responseBody()));
+                        if (!searchBody.tracks || !searchBody.tracks.items || searchBody.tracks.items.length === 0) {
+                            $.say($.whisperPrefix(sender) + "❌ Kein Song gefunden für: " + songInput);
+                            return;
+                        }
+                        
+                        trackId = searchBody.tracks.items[0].id;
+                        log("info", "🎯 Gefunden: " + searchBody.tracks.items[0].name + " von " + searchBody.tracks.items[0].artists[0].name);
                     }
                     
-                    var searchUrl = "https://api.spotify.com/v1/search?q=" + encodeURIComponent(songInput) + "&type=track&limit=1";
-                    var searchUri = Packages.com.gmt2001.httpclient.URIUtil.create(searchUrl);
-                    var searchHeaders = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
-                    searchHeaders.add("Authorization", "Bearer " + ACCESS_TOKEN);
-                    var searchResponse = Packages.com.gmt2001.httpclient.HttpClient.get(searchUri, searchHeaders);
-                    
-                    if (searchResponse.hasException() || !searchResponse.isSuccess()) {
-                        $.say($.whisperPrefix(sender) + "❌ Fehler bei der Spotify-Suche.");
+                    var trackInfo = getTrackInfo(trackId);
+                    if (!trackInfo) {
+                        $.say($.whisperPrefix(sender) + "❌ Konnte Track-Infos nicht abrufen.");
                         return;
                     }
-                    
-                    var searchBody = JSON.parse($.jsString(searchResponse.responseBody()));
-                    if (!searchBody.tracks || !searchBody.tracks.items || searchBody.tracks.items.length === 0) {
-                        $.say($.whisperPrefix(sender) + "❌ Kein Song gefunden für: " + songInput);
-                        return;
+                    if (addTrackToBlacklist(trackId, trackInfo.trackName, trackInfo.artistName)) {
+                        log("info", "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " zur Blacklist hinzugefügt.");
+                        $.say($.whisperPrefix(sender) + "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde blockiert.");
+                    } else {
+                        $.say($.whisperPrefix(sender) + "⚠️ Dieser Song ist bereits blockiert.");
                     }
-                    
-                    trackId = searchBody.tracks.items[0].id;
-                    log("info", "🎯 Gefunden: " + searchBody.tracks.items[0].name + " von " + searchBody.tracks.items[0].artists[0].name);
-                }
-                
-                var trackInfo = getTrackInfo(trackId);
-                if (!trackInfo) {
-                    $.say($.whisperPrefix(sender) + "❌ Konnte Track-Infos nicht abrufen.");
                     return;
                 }
-                if (addTrackToBlacklist(trackId, trackInfo.trackName, trackInfo.artistName)) {
-                    log("info", "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " zur Blacklist hinzugefügt.");
-                    $.say($.whisperPrefix(sender) + "🚫 Song '" + trackInfo.trackName + "' von " + trackInfo.artistName + " wurde blockiert.");
-                } else {
-                    $.say($.whisperPrefix(sender) + "⚠️ Dieser Song ist bereits blockiert.");
-                }
-                return;
             }
 
             if (args[0].equalsIgnoreCase("remove")) {
                 if (args.length < 3) {
-                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock remove artist <Name> | !sblock remove song <Spotify-URL>");
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock remove artist <Name> | !sblock remove song <Spotify-URL oder Name>");
                     return;
                 }
                 
@@ -737,12 +756,45 @@
                 }
 
                 if (args[1].equalsIgnoreCase("song")) {
-                    var songUrl = args[2];
-                    var songTrackId = extractSpotifyId(songUrl);
+                    var songInput = args.slice(2).join(" ");
+                    var songTrackId = extractSpotifyId(songInput);
+                    
+                    // Falls keine Spotify-URL, erst in der Blacklist suchen (Teilmatch)
                     if (!songTrackId) {
-                        $.say($.whisperPrefix(sender) + "❌ Ungültige Spotify-URL.");
-                        return;
+                        var foundTrack = findTrackInBlacklistByName(songInput);
+                        if (foundTrack) {
+                            songTrackId = foundTrack.id;
+                            log("info", "🎯 In Blacklist gefunden: " + foundTrack.name + " von " + foundTrack.artist);
+                        } else {
+                            // Nicht in Blacklist gefunden, versuche Spotify-Suche
+                            log("info", "🔍 Kein gültiger Spotify-Link erkannt, suche nach: " + songInput);
+                            
+                            if (Date.now() >= EXPIRES_AT) {
+                                refreshAccessToken();
+                            }
+                            
+                            var searchUrl = "https://api.spotify.com/v1/search?q=" + encodeURIComponent(songInput) + "&type=track&limit=1";
+                            var searchUri = Packages.com.gmt2001.httpclient.URIUtil.create(searchUrl);
+                            var searchHeaders = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+                            searchHeaders.add("Authorization", "Bearer " + ACCESS_TOKEN);
+                            var searchResponse = Packages.com.gmt2001.httpclient.HttpClient.get(searchUri, searchHeaders);
+                            
+                            if (searchResponse.hasException() || !searchResponse.isSuccess()) {
+                                $.say($.whisperPrefix(sender) + "❌ Fehler bei der Spotify-Suche.");
+                                return;
+                            }
+                            
+                            var searchBody = JSON.parse($.jsString(searchResponse.responseBody()));
+                            if (!searchBody.tracks || !searchBody.tracks.items || searchBody.tracks.items.length === 0) {
+                                $.say($.whisperPrefix(sender) + "❌ Kein Song gefunden für: " + songInput);
+                                return;
+                            }
+                            
+                            songTrackId = searchBody.tracks.items[0].id;
+                            log("info", "🎯 Gefunden: " + searchBody.tracks.items[0].name + " von " + searchBody.tracks.items[0].artists[0].name);
+                        }
                     }
+                    
                     if (removeTrackFromBlacklist(songTrackId)) {
                         log("info", "✅ Song von der Blacklist entfernt.");
                         $.say($.whisperPrefix(sender) + "✅ Song wurde entblockiert.");
@@ -753,7 +805,7 @@
                 }
             }
 
-            $.say($.whisperPrefix(sender) + "Unbekannter Befehl. Verwendung: !sblock list | artist <Name> | song <URL> | remove artist <Name> | remove song <URL>");
+            $.say($.whisperPrefix(sender) + "Unbekannter Befehl. Verwendung: !sblock list | add artist <Name> | add song <URL/Name> | remove artist <Name> | remove song <URL/Name>");
         }
     });
 
