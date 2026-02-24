@@ -669,15 +669,42 @@
 
             if (args[0].equalsIgnoreCase("song")) {
                 if (args.length < 2) {
-                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock song <Spotify-URL>");
+                    $.say($.whisperPrefix(sender) + "Verwendung: !sblock song <Spotify-URL oder Song-Name>");
                     return;
                 }
-                var spotifyUrl = args[1];
-                var trackId = extractSpotifyId(spotifyUrl);
+                
+                var songInput = args.slice(1).join(" ");
+                var trackId = extractSpotifyId(songInput);
+                
+                // Falls keine Spotify-URL, suche nach dem Song
                 if (!trackId) {
-                    $.say($.whisperPrefix(sender) + "❌ Ungültige Spotify-URL.");
-                    return;
+                    log("info", "🔍 Kein gültiger Spotify-Link erkannt, suche nach: " + songInput);
+                    
+                    if (Date.now() >= EXPIRES_AT) {
+                        refreshAccessToken();
+                    }
+                    
+                    var searchUrl = "https://api.spotify.com/v1/search?q=" + encodeURIComponent(songInput) + "&type=track&limit=1";
+                    var searchUri = Packages.com.gmt2001.httpclient.URIUtil.create(searchUrl);
+                    var searchHeaders = Packages.com.gmt2001.httpclient.HttpClient.createHeaders();
+                    searchHeaders.add("Authorization", "Bearer " + ACCESS_TOKEN);
+                    var searchResponse = Packages.com.gmt2001.httpclient.HttpClient.get(searchUri, searchHeaders);
+                    
+                    if (searchResponse.hasException() || !searchResponse.isSuccess()) {
+                        $.say($.whisperPrefix(sender) + "❌ Fehler bei der Spotify-Suche.");
+                        return;
+                    }
+                    
+                    var searchBody = JSON.parse($.jsString(searchResponse.responseBody()));
+                    if (!searchBody.tracks || !searchBody.tracks.items || searchBody.tracks.items.length === 0) {
+                        $.say($.whisperPrefix(sender) + "❌ Kein Song gefunden für: " + songInput);
+                        return;
+                    }
+                    
+                    trackId = searchBody.tracks.items[0].id;
+                    log("info", "🎯 Gefunden: " + searchBody.tracks.items[0].name + " von " + searchBody.tracks.items[0].artists[0].name);
                 }
+                
                 var trackInfo = getTrackInfo(trackId);
                 if (!trackInfo) {
                     $.say($.whisperPrefix(sender) + "❌ Konnte Track-Infos nicht abrufen.");
