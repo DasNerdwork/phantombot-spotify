@@ -144,9 +144,17 @@
     function isBlacklisted(trackId, artistName) {
         var blacklist = loadBlacklist();
         
-        // Prüfe ob Track-ID blockiert ist
+        // Prüfe ob Track-ID oder Song-Name blockiert ist
         for (var i = 0; i < blacklist.blockedTracks.length; i++) {
             if (blacklist.blockedTracks[i].id === trackId) {
+                return { blocked: true, reason: "Song '" + blacklist.blockedTracks[i].name + "' ist blockiert" };
+            }
+            // Teilmatch im Song-Namen (Case-Insensitive)
+            if (blacklist.blockedTracks[i].name.toLowerCase() === trackName.toLowerCase()) {
+                return { blocked: true, reason: "Song '" + blacklist.blockedTracks[i].name + "' ist blockiert" };
+            }
+            // Teilmatch im Song-Namen mit Artist (für Fälle wie "Gute Laune (GroßstadtEngel)")
+            if (trackName.toLowerCase().includes(blacklist.blockedTracks[i].name.toLowerCase())) {
                 return { blocked: true, reason: "Song '" + blacklist.blockedTracks[i].name + "' ist blockiert" };
             }
         }
