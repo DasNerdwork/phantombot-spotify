@@ -139,9 +139,10 @@
      * Prüft ob ein Track oder Artist auf der Blacklist steht
      * @param {string} trackId - Die Spotify Track ID
      * @param {string} artistName - Der Name des Künstlers
+     * @param {string} trackName - Der Name des Tracks
      * @returns {Object} - { blocked: boolean, reason: string }
      */
-    function isBlacklisted(trackId, artistName) {
+    function isBlacklisted(trackId, artistName, trackName) {
         var blacklist = loadBlacklist();
         
         // Prüfe ob Track-ID oder Song-Name blockiert ist
@@ -422,7 +423,7 @@
         }
 
         // Blacklist-Prüfung
-        var blacklistCheck = isBlacklisted(trackId, trackInfo.artistName);
+        var blacklistCheck = isBlacklisted(trackId, trackInfo.artistName, trackInfo.trackName);
         if (blacklistCheck.blocked) {
             log("info", "🚫 Blockierter Song/Artist: " + blacklistCheck.reason);
             $.say($.whisperPrefix(sender) + "🚫 Dieser " + blacklistCheck.reason + " und kann nicht angefordert werden.");
